@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:int-file="http://www.springframework.org/schema/integration/file"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/integration
+           http://www.springframework.org/schema/integration/spring-integration-5.1.xsd
+           http://www.springframework.org/schema/integration/file
+           http://www.springframework.org/schema/integration/file/spring-integration-file-5.1.xsd">
+
+<bean id="activeMQJmsFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+    <property name="brokerURL">
+        <value>tcp://localhost:61616</value>
+    </property>
+</bean>
+
+<bean id="connectionFactory" class="org.springframework.jms.connection.CachingConnectionFactory">
+    <property name="targetConnectionFactory" ref="activeMQJmsFactory" />
+    <property name="sessionCacheSize" value="10"/>
+    <property name="cacheProducers" value="false"/>
+</bean>
+
+<!-- jms Topic -->
+<bean id="myTopic" class="org.apache.activemq.command.ActiveMQTopic"
+      autowire="constructor">
+    <constructor-arg value="jmstopic" />
+</bean>
+
+<bean id="messageConverter" class="net.dintegration.jms.JmsMessageConverter" />
+
+<bean id="messageHander" class="net.dintegration.handler.JmsMessageCustomerHandler" />
+
+<bean id="messageTransformer" class="net.dintegration.transformer.JmsMessageCustomerTransformer" />
+<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+    <property name="connectionFactory" ref="connectionFactory" />
+    <property name="defaultDestination" ref="myTopic" />
+    <property name="messageConverter" ref="messageConverter" />
+</bean>
+<integration:channel id="jmsinchannel"/>
+<integration:channel id="jmsoutchannel"  />
+<jms:inbound-channel-adapter id="jmsIn" destination="myTopic" channel="jmsinchannel" jms-template="jmsTemplate">
+    <integration:poller fixed-rate="30000"/>
+</jms:inbound-channel-adapter>
+<integration:transformer ref="messageTransformer"
+                         input-channel="jmsinchannel" output-channel="jmsoutchannel" />
+<integration:service-activator ref="messageHander" input-channel="jmsoutchannel" />
+    
